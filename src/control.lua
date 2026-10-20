@@ -6,17 +6,28 @@ local CONFIRM_FRAME, CONFIRM_CONTINUE, CONFIRM_CANCEL = "cssa_scan_confirm", "cs
 local LARGE_SCAN_THRESHOLD = 25000
 local pending_scan_entities = {}
 
+-- Factorio 2.1 LuaControlBehavior boolean properties, classified by direction.
+-- Keep this list aligned with the official runtime API; many similarly named
+-- properties from older APIs or prototype names are not runtime behavior flags.
 local input_flags = {
-  "circuit_enable_disable", "circuit_set_filters", "circuit_set_recipe", "circuit_set_stack_size",
-  "circuit_set_signal", "circuit_set_priority", "circuit_set_train_limit", "circuit_set_trains_limit",
-  "circuit_set_requests", "circuit_set_requests_from_buffers",
+  -- Generic on/off and entity-specific circuit controls
+  "circuit_enable_disable", "circuit_condition_enabled",
+  "circuit_set_filters", "circuit_set_recipe", "circuit_set_stack_size",
+  "set_filter", "set_requests", "set_priority", "set_trains_limit",
+  "set_research", "send_to_train", "send_to_platform",
+  "enable_harvesting_condition", "enable_planting_condition", "close_signal", "open_gate",
 }
 local output_flags = {
-  "circuit_read_ingredients", "circuit_read_working", "circuit_read_contents", "circuit_read_hand_contents",
-  "circuit_read_transfers", "read_contents", "read_resources", "read_hand_contents", "read_charge",
-  "read_sensor", "read_robot_stats", "read_logistics", "read_belt_contents", "read_train_id",
-  "read_stopped_train", "read_trains_count", "read_trains_limit", "read_temperature", "read_pollution",
-  "read_ingredients", "read_working", "read_transfers", "read_contents_pulse", "read_signal",
+  -- Manufacturing, inserters, loaders, mining, and other production entities
+  "circuit_read_contents", "circuit_read_hand_contents", "circuit_read_transfers",
+  "circuit_read_ingredients", "circuit_read_resources",
+  -- Shared names used by multiple 2.1 control behaviors
+  "read_contents", "read_empty_slots", "read_content", "read_charge",
+  "read_fuel", "read_research_cost", "read_technology_level",
+  "read_temperature", "read_robot_stats", "read_logistics", "read_sensor",
+  -- Rail signals, train stops, and space platform hubs
+  "read_signal", "read_from_train", "read_stopped_train", "read_trains_count",
+  "read_moving_from", "read_moving_to", "read_speed", "read_damage_taken",
 }
 
 local function safe_get(object, key)
@@ -32,7 +43,10 @@ end
 local function get_networks(behavior, key)
   local v = safe_get(behavior, key)
   if type(v) ~= "table" then return nil end
-  return {red = v.red == true, green = v.green == true}
+  -- CircuitNetworkSelection defaults omitted colors to true (both colors).
+  -- Treat only an explicit false as disabled; otherwise red-only selections
+  -- can be mistaken for no overlap when the API omits the red=true field.
+  return {red = v.red ~= false, green = v.green ~= false}
 end
 local function classify(entity)
   if not entity or not entity.valid then return nil end
